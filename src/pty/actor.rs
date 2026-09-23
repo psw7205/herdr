@@ -1,3 +1,5 @@
+pub(crate) type InputGuard = std::sync::Arc<dyn Fn() -> bool + Send + Sync>;
+
 #[cfg(unix)]
 mod unix;
 

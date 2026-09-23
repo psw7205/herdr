@@ -679,3 +679,9 @@ mod tests {
         );
     }
 }
+
+/// Conditional native input is disabled until a platform provides birth identity.
+#[cfg(not(target_os = "macos"))]
+pub fn process_start_time(_pid: u32) -> Option<(u64, u64)> {
+    None
+}

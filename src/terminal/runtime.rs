@@ -462,6 +462,16 @@ impl TerminalRuntime {
         self.0.try_send_bytes(bytes)
     }
 
+    pub fn queue_guarded_submission(
+        &self,
+        text: Bytes,
+        enter: Bytes,
+        delay: std::time::Duration,
+        guard: crate::pty::actor::InputGuard,
+    ) -> std::io::Result<std::sync::mpsc::Receiver<std::io::Result<()>>> {
+        self.0.queue_guarded_submission(text, enter, delay, guard)
+    }
+
     pub fn queue_user_input_submission(
         &self,
         text: Bytes,

@@ -26,6 +26,12 @@ pub(crate) use super::unix_common::{
 mod bootstrap;
 pub(crate) use bootstrap::{configure_server_daemon_context, prepare_server_process};
 
+/// Kernel process birth time; PID alone is not an incarnation identity.
+pub fn process_start_time(pid: u32) -> Option<(u64, u64)> {
+    let info = process_bsdinfo(pid)?;
+    Some((info.pbi_start_tvsec, info.pbi_start_tvusec))
+}
+
 #[cfg(test)]
 mod config_file_tests;
 

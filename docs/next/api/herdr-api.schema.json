@@ -1222,6 +1222,25 @@
     },
     "request": {
       "$defs": {
+        "AgentBoundInputParams": {
+          "properties": {
+            "binding": {
+              "type": "string"
+            },
+            "input": {
+              "$ref": "#/schemas/request/$defs/BoundInput"
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "target",
+            "binding",
+            "input"
+          ],
+          "type": "object"
+        },
         "AgentPromptParams": {
           "properties": {
             "target": {
@@ -1688,6 +1707,54 @@
             "target"
           ],
           "type": "object"
+        },
+        "BoundInput": {
+          "oneOf": [
+            {
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "prompt",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "interrupt",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "type": {
+                  "const": "terminal_input",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ],
+              "type": "object"
+            }
+          ]
         },
         "ClientShellSurfaceSetParams": {
           "description": "Updates whether the requesting client shell receives and controls pane presentation.",
@@ -5315,6 +5382,38 @@
             },
             "params": {
               "$ref": "#/schemas/request/$defs/AgentTarget"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "agent.binding",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/AgentTarget"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
+              "const": "agent.bound_input",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/AgentBoundInputParams"
             }
           },
           "required": [
@@ -9236,6 +9335,22 @@
           "oneOf": [
             {
               "properties": {
+                "binding": {
+                  "$ref": "#/schemas/success_response/$defs/RuntimeBinding"
+                },
+                "type": {
+                  "const": "agent_binding",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "binding"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
                 "capabilities": {
                   "anyOf": [
                     {
@@ -10586,6 +10701,39 @@
               "type": "object"
             }
           ]
+        },
+        "RuntimeBinding": {
+          "properties": {
+            "agent": {
+              "type": "string"
+            },
+            "cwd": {
+              "type": "string"
+            },
+            "native_session_id": {
+              "type": "string"
+            },
+            "process_id": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "terminal_id": {
+              "type": "string"
+            },
+            "token": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "token",
+            "terminal_id",
+            "agent",
+            "native_session_id",
+            "process_id",
+            "cwd"
+          ],
+          "type": "object"
         },
         "ServerCapabilities": {
           "properties": {

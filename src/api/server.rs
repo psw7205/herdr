@@ -420,6 +420,8 @@ pub(crate) fn api_method_name(method: &Method) -> &'static str {
         Method::TabClose(_) => "tab.close",
         Method::AgentList(_) => "agent.list",
         Method::AgentGet(_) => "agent.get",
+        Method::AgentBinding(_) => "agent.binding",
+        Method::AgentBoundInput(_) => "agent.bound_input",
         Method::AgentRead(_) => "agent.read",
         Method::AgentExplain(_) => "agent.explain",
         Method::AgentSendKeys(_) => "agent.send_keys",

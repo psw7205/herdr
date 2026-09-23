@@ -117,6 +117,10 @@ pub enum Method {
     AgentList(EmptyParams),
     #[serde(rename = "agent.get")]
     AgentGet(AgentTarget),
+    #[serde(rename = "agent.binding")]
+    AgentBinding(AgentTarget),
+    #[serde(rename = "agent.bound_input")]
+    AgentBoundInput(AgentBoundInputParams),
     #[serde(rename = "agent.read")]
     AgentRead(AgentReadParams),
     #[serde(rename = "agent.explain")]

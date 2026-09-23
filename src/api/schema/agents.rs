@@ -232,3 +232,18 @@ pub struct AgentSessionInfo {
     pub kind: crate::agent_resume::AgentSessionRefKind,
     pub value: String,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct AgentBoundInputParams {
+    pub target: String,
+    pub binding: String,
+    pub input: BoundInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BoundInput {
+    Prompt { text: String },
+    Interrupt,
+    TerminalInput { text: String },
+}
