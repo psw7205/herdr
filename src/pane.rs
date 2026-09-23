@@ -1510,6 +1510,34 @@ impl PaneRuntimeIo {
         }
     }
 
+    fn queue_guarded_submission(
+        &self,
+        text: Bytes,
+        enter: Bytes,
+        delay: std::time::Duration,
+        guard: crate::pty::actor::InputGuard,
+    ) -> std::io::Result<std::sync::mpsc::Receiver<std::io::Result<()>>> {
+        #[cfg(unix)]
+        match self {
+            PaneRuntimeIo::Actor(actor) => {
+                actor.queue_guarded_submission(text, enter, delay, Some(guard))
+            }
+            #[cfg(test)]
+            PaneRuntimeIo::TestChannel { .. } => Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "guarded input requires a real PTY actor",
+            )),
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = (text, enter, delay, guard);
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "guarded input requires a Unix PTY actor",
+            ))
+        }
+    }
+
     fn queue_user_input_submission(
         &self,
         text: Bytes,
@@ -3518,6 +3546,16 @@ impl PaneRuntime {
 
     pub fn try_send_bytes(&self, bytes: Bytes) -> Result<(), mpsc::error::TrySendError<Bytes>> {
         self.io.try_send_bytes(bytes)
+    }
+
+    pub fn queue_guarded_submission(
+        &self,
+        text: Bytes,
+        enter: Bytes,
+        delay: std::time::Duration,
+        guard: crate::pty::actor::InputGuard,
+    ) -> std::io::Result<std::sync::mpsc::Receiver<std::io::Result<()>>> {
+        self.io.queue_guarded_submission(text, enter, delay, guard)
     }
 
     pub fn queue_user_input_submission(

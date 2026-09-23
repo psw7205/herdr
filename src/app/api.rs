@@ -2,6 +2,7 @@ use std::time::{Duration, Instant};
 
 mod agent_view;
 mod agents;
+mod bound_input;
 mod env;
 mod integrations;
 mod layouts;
@@ -1080,6 +1081,14 @@ impl App {
             Method::TabClose(target) => return self.handle_tab_close(request.id, target),
             Method::AgentList(_) => return self.handle_agent_list(request.id),
             Method::AgentGet(target) => return self.handle_agent_get(request.id, target),
+            Method::AgentBinding(target) => return self.handle_agent_binding(request.id, target),
+            Method::AgentBoundInput(_) => {
+                return responses::encode_error(
+                    request.id,
+                    "invalid_request",
+                    "bound input requires deferred runtime handling",
+                )
+            }
             Method::AgentFocus(target) => return self.handle_agent_focus(request.id, target),
             Method::AgentRename(params) => return self.handle_agent_rename(request.id, params),
             Method::AgentViewSet(params) => return self.handle_agent_view_set(request.id, params),

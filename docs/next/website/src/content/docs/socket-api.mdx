@@ -106,12 +106,31 @@ Raw socket method names use dot notation:
 | Pane | `pane.split`, `pane.swap`, `pane.move`, `pane.zoom`, `pane.layout`, `pane.process_info`, `pane.neighbor`, `pane.edges`, `pane.focus_direction`, `pane.resize`, `pane.list`, `pane.current`, `pane.get`, `pane.rename`, `pane.send_text`, `pane.send_keys`, `pane.send_input`, `pane.read`, `pane.report_agent`, `pane.report_agent_session`, `pane.report_metadata`, `pane.clear_agent_authority`, `pane.release_agent`, `pane.close`, `pane.wait_for_output` |
 | Popup | `popup.close` |
 | Layout | `layout.export`, `layout.apply`, `layout.set_split_ratio` |
-| Agent | `agent.list`, `agent.get`, `agent.read`, `agent.explain`, `agent.send_keys`, `agent.prompt`, `agent.wait`, `agent.rename`, `agent.focus`, `agent.start`, `agent.view.set`, `agent.view.clear` |
+| Agent | `agent.list`, `agent.get`, `agent.binding`, `agent.bound_input`, `agent.read`, `agent.explain`, `agent.send_keys`, `agent.prompt`, `agent.wait`, `agent.rename`, `agent.focus`, `agent.start`, `agent.view.set`, `agent.view.clear` |
 | Events | `events.subscribe`, `events.wait` |
 | Integrations | `integration.install`, `integration.uninstall` |
 | Plugins | `plugin.link`, `plugin.list`, `plugin.unlink`, `plugin.enable`, `plugin.disable`, `plugin.action.list`, `plugin.action.invoke`, `plugin.log.list`, `plugin.pane.open`, `plugin.pane.focus`, `plugin.pane.close` |
 
 `agent.wait` is server-owned and event-driven. It pins the resolved pane occupant so a replacement cannot satisfy the wait. `agent.prompt` accepts an optional `wait` object with `until` and `timeout_ms`; this submits the prompt and starts the wait in one request, avoiding a race between separate calls. If the resolved agent is already `blocked`, `agent.prompt` returns `agent_blocked` without sending input or starting the wait.
+
+For a client that keeps a pane open while its foreground process may change, use
+`agent.binding` and `agent.bound_input`. The initial verified binding supports
+interactive Claude Code on macOS when its native process metadata is available.
+Unsupported or ambiguous identity returns `runtime_binding_unavailable`.
+
+```json
+{"id":"binding","method":"agent.binding","params":{"target":"w1:p2"}}
+{"id":"input","method":"agent.bound_input","params":{"target":"w1:p2","binding":"<token from binding response>","input":{"type":"prompt","text":"Continue the task"}}}
+```
+
+The binding response contains an opaque `token`, `terminal_id`, `agent`,
+`native_session_id`, `process_id`, and `cwd`. `agent.bound_input` accepts
+`prompt`, `interrupt`, or `terminal_input`. Herdr checks the same native
+process/session binding before queueing and again before each PTY write. A
+mismatch is rejected without submitting input. Once any text may have been
+written, a later failure is reported as uncertain; the caller must not retry
+blindly. These methods do not start or resume an agent. A binding token is a
+stale-session guard, not an authentication credential.
 
 `workspace.move_block` atomically moves the ordered `workspace_ids` before `before_workspace_id`; omit the anchor to move the block to the end. The ids must be unique and the anchor cannot be part of the block. The response contains the authoritative ordered workspace list.
 

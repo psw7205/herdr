@@ -10,6 +10,7 @@ use bytes::Bytes;
 use tokio::sync::mpsc::{self, error::TryRecvError as DataTryRecvError};
 use tracing::{debug, warn};
 
+use super::InputGuard;
 use crate::pty::fd;
 
 // Actor handle methods must call wake_actor() after queuing work. The idle
@@ -77,6 +78,7 @@ enum PtyIoDataCommand {
         text: Bytes,
         enter: Bytes,
         delay: Duration,
+        guard: Option<InputGuard>,
         reply: std_mpsc::Sender<std::io::Result<()>>,
     },
 }
@@ -146,6 +148,16 @@ impl PtyIoActorHandle {
         enter: Bytes,
         delay: Duration,
     ) -> std::io::Result<std_mpsc::Receiver<std::io::Result<()>>> {
+        self.queue_guarded_submission(text, enter, delay, None)
+    }
+
+    pub(crate) fn queue_guarded_submission(
+        &self,
+        text: Bytes,
+        enter: Bytes,
+        delay: Duration,
+        guard: Option<InputGuard>,
+    ) -> std::io::Result<std_mpsc::Receiver<std::io::Result<()>>> {
         let user_writes = self
             .user_writes
             .lock()
@@ -162,6 +174,7 @@ impl PtyIoActorHandle {
                 text,
                 enter,
                 delay,
+                guard,
                 reply: reply_tx,
             })
             .map_err(|err| match err {
@@ -459,6 +472,7 @@ struct PtyIoActorRunner {
 }
 
 struct ActiveSubmission {
+    guard: Option<InputGuard>,
     enter: Bytes,
     delay: Duration,
     phase: SubmissionPhase,
@@ -645,6 +659,7 @@ impl PtyIoActorRunner {
                 text,
                 enter,
                 delay,
+                guard,
                 reply,
             } => {
                 if self.state == ActorState::Running {
@@ -655,6 +670,7 @@ impl PtyIoActorRunner {
                         SubmissionPhase::WritingText
                     };
                     self.active_submission = Some(ActiveSubmission {
+                        guard,
                         enter,
                         delay,
                         phase,
@@ -930,6 +946,23 @@ impl PtyIoActorRunner {
 
     fn flush_pending_writes_once(&mut self) -> std::io::Result<Option<SubmissionBoundary>> {
         while let Some(write) = self.pending_writes.front() {
+            if write.boundary.is_some()
+                && self
+                    .active_submission
+                    .as_ref()
+                    .and_then(|submission| submission.guard.as_ref())
+                    .is_some_and(|guard| !guard())
+            {
+                // Reject this command only. A stale remote client must never
+                // terminate the PTY actor or discard ordinary desktop input.
+                self.pending_writes.retain(|write| write.boundary.is_none());
+                self.current_write_offset = 0;
+                self.fail_active_submission(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "runtime_binding_mismatch",
+                ));
+                return Ok(None);
+            }
             let chunk = &write.bytes[self.current_write_offset..];
             match self.file.write(chunk) {
                 Ok(0) => {
@@ -1114,6 +1147,64 @@ mod tests {
             poll_observer: None,
         };
         (runner, peer)
+    }
+
+    #[test]
+    fn guarded_submission_rejects_stale_binding_without_stopping_actor() {
+        let (handle, mut peer, _read_rx) = actor_with_socket_pair(false);
+        let completion = handle
+            .queue_guarded_submission(
+                Bytes::from_static(b"stale"),
+                Bytes::from_static(b"\r"),
+                Duration::ZERO,
+                Some(Arc::new(|| false)),
+            )
+            .expect("queues");
+        assert_eq!(
+            completion
+                .recv_timeout(Duration::from_secs(1))
+                .unwrap()
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::PermissionDenied
+        );
+        handle
+            .try_write_user_input(Bytes::from_static(b"valid"))
+            .unwrap();
+        let mut received = [0; 5];
+        peer.read_exact(&mut received).unwrap();
+        assert_eq!(&received, b"valid");
+        handle.shutdown();
+    }
+
+    #[test]
+    fn guarded_submission_revalidates_before_enter() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let (handle, mut peer, _read_rx) = actor_with_socket_pair(false);
+        let current = Arc::new(AtomicBool::new(true));
+        let check = current.clone();
+        let completion = handle
+            .queue_guarded_submission(
+                Bytes::from_static(b"text"),
+                Bytes::from_static(b"\r"),
+                Duration::from_millis(100),
+                Some(Arc::new(move || check.load(Ordering::SeqCst))),
+            )
+            .unwrap();
+        let mut received = [0; 4];
+        peer.read_exact(&mut received).unwrap();
+        assert_eq!(&received, b"text");
+        current.store(false, Ordering::SeqCst);
+        assert!(completion
+            .recv_timeout(Duration::from_secs(1))
+            .unwrap()
+            .is_err());
+        handle
+            .try_write_user_input(Bytes::from_static(b"next"))
+            .unwrap();
+        peer.read_exact(&mut received).unwrap();
+        assert_eq!(&received, b"next");
+        handle.shutdown();
     }
 
     #[test]
