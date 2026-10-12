@@ -1,0 +1,4 @@
+[tools]
+just = "1.40.0"
+zig = "0.16.0"
+"aqua:nextest-rs/nextest/cargo-nextest" = "0.9.146"
